@@ -65,12 +65,15 @@ static float lines_colors[] = {
 	0.0, 0.0, 1.0
 };
 
-static void get_ray_dir(const double *screen, GLfloat *out_ray){
-	//http://antongerdelan.net/opengl/raycasting.html
-	GLfloat ray_clip[4], ray_eye[4], ray_world[4];
-	GLfloat projection_inverse[16], view_inverse[16];
-	mat4_inverse(projection_inverse, camera.projection_matrix);
-	mat4_inverse(view_inverse, camera.view_matrix);
+static void get_ray_dir(const double *screen, float *out_ray){
+	float ray_clip[4], ray_eye[4], ray_world[4];
+	float projection_inverse[16], view_inverse[16];
+	if (!mat4_inverse(projection_inverse, camera.projection_matrix)){
+		printf("ERR1!\n");
+	}
+	if (!mat4_inverse(view_inverse, camera.view_matrix)){
+		printf("ERR2!\n");
+	}
 
 	ray_clip[0] = screen[0]; ray_clip[1] = screen[1]; ray_clip[2] = 1.0; ray_clip[3] = 1.0;
 
@@ -89,53 +92,38 @@ static void get_ray_dir(const double *screen, GLfloat *out_ray){
 }
 
 static int raycast(const double *screen){
-    GLfloat ray_world[3];
+    float ray[3];
 
-	get_ray_dir(screen, ray_world);
+	get_ray_dir(screen, ray);
 
     //http://gamedev.stackexchange.com/questions/18436/most-efficient-aabb-vs-ray-collision-algorithms
-    float lb[3], rt[3], t[6];
+    double box_min[3], box_max[3];
     int i;
     for(i = 0;i < 3;i++){
-        lb[i] = psystem->attractor[i] - psystem->attractor_size;
-        rt[i] = psystem->attractor[i] + psystem->attractor_size;
+        box_min[i] = psystem->attractor[i] - psystem->attractor_size;
+        box_max[i] = psystem->attractor[i] + psystem->attractor_size;
     }
 
-	double T_1[3], T_2[3];
-	double t_near = -DBL_MAX;
-	double t_far = DBL_MAX;
+	double tmin = -DBL_MAX, tmax = DBL_MAX;
+    double t1,t2;
+    for(i = 0;i < 3;i++){
+        if (ray[i] != 0.0) {
+            t1 = (box_min[i] - camera.location[i])/ray[i];
+            t2 = (box_max[i] - camera.location[i])/ray[i];
+ 
+            tmin = max(tmin, min(t1, t2));
+            tmax = min(tmax, max(t1, t2));
+        } else if (camera.location[i] <= box_min[i] || camera.location[i] >= box_max[i]) {
+            return 0;
+        }
+    }
 
-	for (i = 0; i < 3; i++) {
-		if (ray_world[i] == 0) {
-			if (camera.location[i] < lb[i] || camera.location[i] > rt[i]){
-				printf("NOPE1!\n");
-				return 0; // parallel AND outside box : no intersection possible
-			}
-		} else { // ray not parallel to planes in this direction
-			T_1[i] = (lb[i] - camera.location[i]) / ray_world[i];
-			T_2[i] = (rt[i] - camera.location[i]) / ray_world[i];
+	if(tmax > tmin && tmax > 0.0){
+        attractor_capture_dist = tmin;    
+        return 1;
+    }
 
-			if (T_1[i] > T_2[i]) {
-				double q = T_2[i];
-				T_2[i] = T_1[i];
-				T_1[i] = q;
-			}
-
-			if (T_1[i] > t_near) {
-				t_near = T_1[i];
-			}
-			if (T_2[i] < t_far) {
-				t_far = T_2[i];
-			}
-			if ((t_near > t_far) || (t_far < 0)) {
-				printf("NOPE2!\n");
-				return 0;
-			}
-		}
-	}
-
-	attractor_capture_dist = t_near;
-	return 1;
+    return 0;
 }
 
 static void mouse_callback(GLFWwindow *w,int button, int action, int mods)
@@ -143,9 +131,9 @@ static void mouse_callback(GLFWwindow *w,int button, int action, int mods)
     update_mouse(&inputs, w, button, action, mods);
     if(inputs.left_mouse_down){
         double mouse[2];
-        glfwGetCursorPos(w, &mouse_start_pos[0], &mouse_start_pos[1]);      
-        mouse[0] = 2 * mouse_start_pos[0] / (float)width - 1;
-        mouse[1] = -2 * mouse_start_pos[1] / (float)height + 1;
+        glfwGetCursorPos(w, &mouse_start_pos[0], &mouse_start_pos[1]);
+        mouse[0] = 2 * mouse_start_pos[0] / (double)width - 1;
+        mouse[1] = -2 * mouse_start_pos[1] / (double)height + 1;
         if(raycast(mouse)){
             attractor_captured = 1;
             printf("HIT!\n");
@@ -240,14 +228,14 @@ static void update_fps(double total_time){
 static void drag_attractor(){
 	double mouse[2];
 	glfwGetCursorPos(window, &mouse_start_pos[0], &mouse_start_pos[1]);
-	mouse[0] = 2 * mouse_start_pos[0] / (float)width - 1;
-	mouse[1] = -2 * mouse_start_pos[1] / (float)height + 1;
-	GLfloat ray_dir[3];
-	get_ray_dir(mouse, ray_dir);
+	mouse[0] = 2.0 * mouse_start_pos[0] / (double)width - 1.0;
+	mouse[1] = -2.0 * mouse_start_pos[1] / (double)height + 1.0;
+	float ray[3];
+	get_ray_dir(mouse, ray);
 
 	int i;
 	for (i = 0; i < 3; i++) {
-		psystem->attractor[i] = camera.location[i] + ray_dir[i] * attractor_capture_dist;
+		psystem->attractor[i] = camera.location[i] + ray[i] * attractor_capture_dist;
 	}
 }
 
@@ -304,7 +292,7 @@ static void update(double total_time){
         }
 
         if(attrac_forwards != 0){
-            GLfloat forwards[3];
+            float forwards[3];
             get_forwards_dir(camera, forwards);
             psystem->attractor[0] += attrac_forwards * update_dt * forwards[0];
             psystem->attractor[1] += attrac_forwards * update_dt * forwards[1];
@@ -312,7 +300,7 @@ static void update(double total_time){
         }
 
         if(attrac_side != 0){
-            GLfloat side[3];
+            float side[3];
             get_side_dir(camera, side);
             psystem->attractor[0] += attrac_side * update_dt * side[0];
             psystem->attractor[1] += attrac_side * update_dt * side[1];

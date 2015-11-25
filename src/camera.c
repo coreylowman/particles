@@ -23,7 +23,7 @@ void camera_init(Camera *camera, int width, int height){
     update_projection_matrix(camera);
 }
 
-void get_forwards_dir(Camera camera, GLfloat *out_dir){
+void get_forwards_dir(Camera camera, float *out_dir){
 	int i;
 	for (i = 0; i < 3; i++) {
         out_dir[i] = camera.look_at[i] - camera.location[i];
@@ -31,9 +31,9 @@ void get_forwards_dir(Camera camera, GLfloat *out_dir){
     normalize(out_dir);
 }
 
-void get_side_dir(Camera camera, GLfloat *out_dir){
+void get_side_dir(Camera camera, float *out_dir){
     int i;
-    GLfloat forwards[3];
+    float forwards[3];
 
     for (i = 0; i < 3; i++) {
         forwards[i] = camera.look_at[i] - camera.location[i];
@@ -46,7 +46,7 @@ void get_side_dir(Camera camera, GLfloat *out_dir){
 
 void move_forwards(Camera *camera, double dt, float direction){
     int i;
-    GLfloat forwards[3];
+    float forwards[3];
     for (i = 0; i < 3; i++) {
         forwards[i] = camera->look_at[i] - camera->location[i];
     }
@@ -59,7 +59,7 @@ void move_forwards(Camera *camera, double dt, float direction){
 
 void strafe(Camera *camera, double dt, float direction){
     int i;
-    GLfloat forwards[3], sideways[3];
+    float forwards[3], sideways[3];
 
     for (i = 0; i < 3; i++) {
         forwards[i] = camera->look_at[i] - camera->location[i];
@@ -77,7 +77,7 @@ void strafe(Camera *camera, double dt, float direction){
 
 void rotate_view(Camera *camera, double side_amt, double up_amt){
     int i;
-    GLfloat forwards[3], sideways[3];
+    float forwards[3], sideways[3];
 
     for (i = 0; i < 3; i++) {
         forwards[i] = camera->look_at[i] - camera->location[i];
@@ -96,7 +96,6 @@ void move_vertically(Camera *camera, double dt, float direction){
     camera->look_at[1] += direction * dt;
     camera->location[1] += direction * dt;
 }
-
 
 void update_view_matrix(Camera *camera){
 	mat4_ident(camera->view_matrix);

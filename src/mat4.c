@@ -1,137 +1,29 @@
 #include <math.h>
 #include "mat4.h"
 
-//https://en.wikipedia.org/wiki/Fast_inverse_square_root
-static float q_invsqrt(float n){
-	long i;
-	float x2, y;
-	const float threehalfs = 1.5F;
-
-	x2 = n * 0.5F;
-	y = n;
-	i = *(long *)&y;                       // evil floating point bit level hacking
-	i = 0x5f3759df - (i >> 1);               // what the fuck? 
-	y = *(float *)&i;
-	y = y * (threehalfs - (x2 * y * y));   // 1st iteration
-	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
-
-	return y;
-}
-
-void normalize(GLfloat *arr){
-	GLfloat x = arr[0];
-	GLfloat y = arr[1];
-	GLfloat z = arr[2];
-	GLfloat length_sqrd = x * x + y * y + z * z;
-	GLfloat inv_sqrt_length = q_invsqrt(length_sqrd);
-	arr[0] = x * inv_sqrt_length;
-	arr[1] = y * inv_sqrt_length;
-	arr[2] = z * inv_sqrt_length;
-}
-
-void normalize_d(GLdouble *arr){
-	GLdouble x = arr[0];
-	GLdouble y = arr[1];
-	GLdouble z = arr[2];
-	GLdouble length = sqrt(x * x + y * y + z * z);
-	arr[0] = x / length;
-	arr[1] = y / length;
-	arr[2] = z / length;
-}
-
-void cross(GLfloat *out, GLfloat *vec1, GLfloat *vec2){
-    out[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1];
-    out[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2];
-    out[2] = vec1[0] * vec2[1] - vec1[1] * vec2[0];
-}
-
-GLfloat dot(GLfloat *vec1, GLfloat *vec2){
-    GLfloat sum = 0;
-    int i;
-    for(i = 0;i < 3;i++){
-        sum += vec1[i] * vec2[i];
-    }
-    return sum;
-}
-
-void mat4_ident(GLfloat *mat){
+void mat4_ident(float *mat){
     mat[0] = 1;     mat[1] = 0;     mat[2] = 0;     mat[3] = 0;
     mat[4] = 0;     mat[5] = 1;     mat[6] = 0;     mat[7] = 0;
     mat[8] = 0;     mat[9] = 0;     mat[10] = 1;    mat[11] = 0;
     mat[12] = 0;    mat[13] = 0;    mat[14] = 0;    mat[15] = 1;
 }
 
-void mat4_mul(GLfloat *src1, GLfloat *src2){
-    int i,j,k;
-    GLfloat dest[16];
-    for (i = 0; i < 4; i++) {
-        for (j = 0; j < 4; j++) {
-            dest[i * 4 + j] = 0;
-            for (k = 0; k < 4; k++) {
-                dest[i * 4 + j] += src1[i * 4 + k] * src2[k * 4 + j];
-            }
-        }
-    }
-    for (i = 0; i < 16; i++) {
-        src1[i] = dest[i];
-    }
-}
-
-void mat4_trans(GLfloat *mat, float x, float y, float z){
-    GLfloat trans_mat[16];
-    mat4_ident(trans_mat);
-    trans_mat[3] += x;
-    trans_mat[7] += y;
-    trans_mat[11] += z;
-    mat4_mul(mat, trans_mat);
-}
-
-void mat4_rot_x(GLfloat *mat, float angle){
-    float s = sin(angle); float c = cos(angle);
-    GLfloat rot_mat[16];
-    mat4_ident(rot_mat);
-    rot_mat[0] = 1;
-                    rot_mat[5] = c;     rot_mat[6] = -s;
-                    rot_mat[9] = s;     rot_mat[10] = c;
-    mat4_mul(mat, rot_mat);
-}
-
-void mat4_rot_y(GLfloat *mat, float angle){
-    float s = sin(angle); float c = cos(angle);
-    GLfloat rot_mat[16];
-    mat4_ident(rot_mat);
-    rot_mat[0] = c;                     rot_mat[2] = s;
-                    rot_mat[5] = 1;
-    rot_mat[8] = -s;                    rot_mat[10] = c;
-    mat4_mul(mat, rot_mat);
-}
-
-void mat4_rot_z(GLfloat *mat, float angle){
-    float s = sin(angle); float c = cos(angle);
-    GLfloat rot_mat[16];
-    mat4_ident(rot_mat);
-    rot_mat[0] = c; rot_mat[1] = -s;
-    rot_mat[4] = s; rot_mat[5] = c;
-                                    rot_mat[10] = 1;
-    mat4_mul(mat, rot_mat);
-}
-
 static float radians(float degrees){
 	return degrees * 3.14159265 / 180.0;
 }
 
-void mat4_persp(GLfloat *mat, float fov, float aspect, float zNear, float zFar){
-	float tanHalf = tan(radians(fov) / 2.0);	
+void mat4_persp(float *mat, float fov, float aspect, float zNear, float zFar){
+    float tanHalf = tan(radians(fov) / 2.0);    
 
     mat[0] = 1 / (aspect * tanHalf); mat[1] = 0; mat[2] = 0; mat[3] = 0;
     mat[4] = 0; mat[5] = 1 / tanHalf; mat[6] = 0; mat[7] = 0;
-	mat[8] = 0; mat[9] = 0; mat[10] = -(zFar + zNear) / (zFar - zNear); mat[11] = -(2 * zFar * zNear) / (zFar - zNear);
-	mat[12] = 0; mat[13] = 0; mat[14] = -1; mat[15] = 0;
+    mat[8] = 0; mat[9] = 0; mat[10] = -(zFar + zNear) / (zFar - zNear); mat[11] = -(2 * zFar * zNear) / (zFar - zNear);
+    mat[12] = 0; mat[13] = 0; mat[14] = -1; mat[15] = 0;
 }
 
-void mat4_lookat(GLfloat *mat,GLfloat *eye, GLfloat *center, GLfloat *up){
+void mat4_lookat(float *mat,float *eye, float *center, float *up){
     int i;
-    GLfloat f[3], s[3], u[3];
+    float f[3], s[3], u[3];
 
     for(i = 0;i < 3;i++){
         f[i] = center[i] - eye[i];
@@ -148,8 +40,8 @@ void mat4_lookat(GLfloat *mat,GLfloat *eye, GLfloat *center, GLfloat *up){
 	mat[8] = -f[0];         mat[9] = -f[1];        mat[10] = -f[2];		mat[11] = dot(f, eye);
 }
 
-int mat4_inverse(GLfloat *out_mat, GLfloat *m){
-	GLfloat inv[16], det;
+int mat4_inverse(float *out_mat, float *m){
+	float inv[16], det;
 	int i;
 
 	inv[0] = m[5] * m[10] * m[15] -
@@ -277,7 +169,7 @@ int mat4_inverse(GLfloat *out_mat, GLfloat *m){
 	return 1;
 }
 
-void mat4_mul_vec4(GLfloat *out_vec, GLfloat *mat, GLfloat *vec){
+void mat4_mul_vec4(float *out_vec, float *mat, float *vec){
     int i;
     for(i = 0;i < 4;i++){
         out_vec[i] = 0;
@@ -286,4 +178,30 @@ void mat4_mul_vec4(GLfloat *out_vec, GLfloat *mat, GLfloat *vec){
         out_vec[i] += mat[i * 4 + 2] * vec[2];
         out_vec[i] += mat[i * 4 + 3] * vec[3];
     }
+}
+
+void cross(float *out, float *vec1, float *vec2){
+    out[0] = vec1[1] * vec2[2] - vec1[2] * vec2[1];
+    out[1] = vec1[2] * vec2[0] - vec1[0] * vec2[2];
+    out[2] = vec1[0] * vec2[1] - vec1[1] * vec2[0];
+}
+
+float dot(float *vec1, float *vec2){
+    float sum = 0;
+    int i;
+    for(i = 0;i < 3;i++){
+        sum += vec1[i] * vec2[i];
+    }
+    return sum;
+}
+
+void normalize(float *arr){
+    float x = arr[0];
+    float y = arr[1];
+    float z = arr[2];
+    float length = sqrt(x * x + y * y + z * z);
+    float inv_length = 1 / length;
+    arr[0] = x * inv_length;
+    arr[1] = y * inv_length;
+    arr[2] = z * inv_length;
 }
